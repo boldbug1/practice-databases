@@ -1,9 +1,8 @@
 import express from 'express';
 const router = express.Router();
-import pool from '../database/pool.js'
-import { getTasks } from '../database/queries.js';
+import { getTasks, patchTasks, postTasks } from '../database/queries.js';
 
-
+   
 router.get('/', async (req, res) => {
   try {
     const assigned_person = req.query.name || ''
@@ -11,33 +10,24 @@ router.get('/', async (req, res) => {
     const current_page = parseInt(req.query.page) || 1
     const limit = parseInt(req.query.limit) || 3
     const offset = (current_page - 1) * limit
-
+   
     const response = await getTasks(assigned_person,priority,limit,offset,current_page);
 
     console.log(response)
     res.status(200).json(response)
-  } catch {
-    res.status(500).json('Error while fetching data')
+  } catch(error) {
+    console.log(error); 
+    
+    res.status(500).json('Error while fetching data') 
   }
 })
 
 router.post('/', async (req, res) => {
   try {
-    const { title, assigned_to, priority, status, due_date } = req.body
-    console.log(title)
-    const taskCreateQuery = `
-    INSERT INTO tasks (title,assigned_to,priority,status,due_date)
-    VALUES ($1,$2,$3,$4,$5) 
-    RETURNING *;
-    `
-    const tasksCreate = await pool.query(taskCreateQuery, [
-      title,
-      assigned_to,
-      priority,
-      status,
-      due_date
-    ])
-    res.status(201).json(tasksCreate.rows[0])
+    const { title, assigned_to, priority, status, due_date } = req.body;
+
+    const response = await postTasks(title, assigned_to, priority, status, due_date);
+    res.status(201).json(response);
   } catch (error) {
     console.log(`${error}`)
     console.log('Database Error : Error while post data')
@@ -53,39 +43,17 @@ router.patch('/:id', async (req, res) => {
       return res.status(400).json({ error: 'No update fields provided' })
     }
 
-    let queryParts = []
-    let queryValues = []
-    let PlaceHolderIndex = 1
-    for (const key in Updates) {
-      if (
-        ['title', 'assigned_to', 'priority', 'status', 'due_date'].includes(key)
-      ) {
-        queryParts.push(`${key} = $${PlaceHolderIndex}`)
-        queryValues.push(Updates[key])
-        PlaceHolderIndex++
-      }
+    const updatedTask = await patchTasks(taskId,Updates);
+
+    if(!updatedTask){
+      return res.status(404).json("Task not found");
     }
 
-    queryValues.push(taskId)
-    const idPlaceHolder = `$${PlaceHolderIndex}`
-
-    const updateQuery = `
-    UPDATE tasks
-    SET ${queryParts.join(',')}
-    WHERE task_id = ${idPlaceHolder}
-    RETURNING *;
-    `
-
-    const result = await pool.query(updateQuery, queryValues)
-
-    if (result.rows.length === 0) {
-      return res.status(404).json('Task not found')
-    }
-
-    res.status(200).json(result.rows[0])
+    return res.status(200).json(updatedTask);
+    
   } catch (error) {
     console.error('Patch Execution Error:', error)
-    res.status(500).json('Error updating task parameters');
+    return res.status(500).json('Error updating task parameters');
   }
 });
 

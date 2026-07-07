@@ -1,6 +1,8 @@
 import pool from "./pool.js"
 
-export async function getTasks(assigned_person,priority,limit,offset,current_page){
+export async function getTasks(assigned_person, priority, limit, offset, current_page) {
+
+  try {
     let queryParams = [assigned_person + '%']
     let baseWhereClause = `WHERE assigned_to ILIKE $1`
 
@@ -21,13 +23,13 @@ export async function getTasks(assigned_person,priority,limit,offset,current_pag
     ])
 
     const countQuery = `
-    SELECT COUNT(*) FROM tasks
+    SELECT COUNT(*) AS total FROM tasks
     ${baseWhereClause};
     `
 
     const countResults = await pool.query(countQuery, [...queryParams])
 
-    const totalCount = parseInt(countResults.rows[0].count)
+    const totalCount = parseInt(countResults.rows[0]?.total) || 0
 
     const response = {
       tasks: tasksResults.rows,
@@ -40,4 +42,71 @@ export async function getTasks(assigned_person,priority,limit,offset,current_pag
     }
 
     return response;
+  } catch (error) {
+    console.error("Database error in getTasks", error.message);
+    throw error;
+  }
+}
+
+
+export async function postTasks(title, assigned_to,priority,status,due_date) {
+  try {
+  const taskCreateQuery = `
+  INSERT INTO tasks (title,assigned_to,priority,status,due_date)
+  VALUES ($1,$2,$3,$4,$5) 
+  RETURNING *;
+  `
+  const tasksCreate = await pool.query(taskCreateQuery, [
+    title,
+    assigned_to,
+    priority,
+    status,
+    due_date
+  ]);
+
+  if (tasksCreate.rows.length === 0) {
+       throw new Error("Task creation failed: No data returned.");
+     }
+ 
+  return tasksCreate.rows[0]; 
+  } catch (error) {
+    console.error("Database error in postTasks", error.message);
+    throw error;
+}
+}
+
+
+export async function patchTasks(taskId,Updates) {
+
+  try{
+    let queryParts = []
+    let queryValues = []
+    let PlaceHolderIndex = 1
+    for (const key in Updates) {
+      if (
+        ['title', 'assigned_to', 'priority', 'status', 'due_date'].includes(key)
+      ) {
+        queryParts.push(`${key} = $${PlaceHolderIndex}`)
+        queryValues.push(Updates[key])
+        PlaceHolderIndex++
+      }
+    }
+
+    queryValues.push(taskId)
+    const idPlaceHolder = `$${PlaceHolderIndex}`
+
+    const updateQuery = `
+    UPDATE tasks
+    SET ${queryParts.join(',')}
+    WHERE task_id = ${idPlaceHolder}
+    RETURNING *;
+    `
+
+    const updatedTask = await pool.query(updateQuery, queryValues);
+    
+    return updatedTask?.rows[0];
+  }catch(error){
+    console.error("Database error patchTasks",error.message);
+    throw error;
+  }
 }
