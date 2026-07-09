@@ -3,6 +3,7 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import type { CorsOptions } from 'cors';
 import tasksRouter from '../routes/tasksRouter.js';
+import logger from '../middleware/logger.js'
 
 const whiteList = ['http://localhost:3000'];
 
@@ -19,9 +20,10 @@ const corsOptions: CorsOptions = {
 const app = express();
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(logger);
 app.use('/api/tasks', tasksRouter);
 
-app.get('/', (_req: Request, res: Response) => {
+app.get('/', (req: Request, res: Response) => {
   res.json('server is running');
 });
 

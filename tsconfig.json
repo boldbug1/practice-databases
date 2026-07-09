@@ -28,5 +28,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "routes/**/*.ts", "database/**/*.ts"] 
+  "include": ["src/**/*.ts", "routes/**/*.ts", "database/**/*.ts","middleware/**/*.ts"] 
 }
